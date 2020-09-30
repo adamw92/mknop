@@ -5,6 +5,8 @@ on:
     - cron: '0 22 * * 5'
   repository_dispatch:
     types: 'run'
+  watch:
+    types: started
     
 env:
   TZ: 'Asia/Shanghai'
@@ -12,7 +14,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-18.04
-    if: github.event_name == 'schedule' || github.event.action == 'run'
+    if: github.event_name == 'schedule' || github.event.action == 'run' || github.event_name == 'watch'
 
     steps:
       - name: Checkout
@@ -27,24 +29,20 @@ jobs:
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
-
       - name: Clone Lean's openwrt
         run: |
           git clone https://github.com/coolsnowwolf/lede
-
       - name: Install feeds & Make config
         env:
           CONFIG: '.github/config'
         run: |
           chmod +x $CONFIG
           ./$CONFIG
-
       - name: Compile openwrt
         run: |
           cd lede
           make download -j8
           make -j$(nproc) || make -j1 V=s
-
       - name: Build firmware
         run: |
           cp lede/bin/targets/*/*/*.tar.gz ./openwrt
@@ -60,7 +58,6 @@ jobs:
             cd ../
             echo "::set-env name=firmware_$((++i))::$filename"
           done
-
       - name: Upload firmware @ kernel 5.4.66
         uses: actions/upload-artifact@main
         with:
